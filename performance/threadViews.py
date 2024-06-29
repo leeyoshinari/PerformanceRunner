@@ -162,7 +162,7 @@ def upload_file(request):
                 file_path = os.path.join(file_folder, file_name)
                 with open(file_path, 'wb') as f:
                     f.write(form.file.read())
-                file_url = f'{settings.FILE_URL}{settings.STATIC_URL}files/{plan_id}/{file_name}'
+                file_url = f'{settings.FILE_URL}/{settings.STATIC_URL}files/{plan_id}/{file_name}'
             else:
                 res = settings.MINIO_CLIENT.upload_file_bytes(file_name, form.file, form.size)
                 file_url = f'{settings.FILE_URL}{res.bucket_name}/{res.object_name}'

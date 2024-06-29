@@ -109,7 +109,7 @@ function deploy(url, host, package_id, s, a) {
     let post_data = {
         'host': host,
         "id": package_id,
-        'address': window.location.host
+        'address': window.location.protocol + "//" + window.location.host
     }
     $.ajax({
         type: 'POST',

@@ -37,7 +37,7 @@ urlpatterns = [
     path('plan/variable', planViews.edit_variable, name='plan_variable'),
 
     path('task', taskViews.home, name='task_home'),
-    path('task/register', taskViews.register, name='agent_register'),
+    # path('task/register', taskViews.register, name='agent_register'),
     path('task/status', taskViews.get_running_status, name='task_status'),
     path('task/add', taskViews.add_to_task, name='task_add'),
     path('task/delete', taskViews.delete_task, name='task_delete'),
@@ -46,13 +46,14 @@ urlpatterns = [
     path('task/download', taskViews.download_file, name='task_download'),
     path('task/download/log', taskViews.download_log, name='task_download_log'),
     path('task/change', taskViews.change_tps, name='change_tps'),
-    path('task/register/getMessage', taskViews.set_message, name='task_set_message'),
+    # path('task/register/getMessage', taskViews.set_message, name='task_set_message'),
     path('task/query', taskViews.query_data, name='task_query'),
     path('task/detail', taskViews.view_task_detail, name='task_detail'),
     path('task/getIdleServer', taskViews.get_idle_server, name='get_idle_server'),
     path('task/getUsedServer', taskViews.get_used_server, name='get_used_server'),
     path('task/getRunningServer', taskViews.get_running_server, name='get_running_server'),
     path('task/autoRun', views.request_auto_run, name='auto_run_test'),
+    # path('task/cancel', views)
 
     path('group', threadViews.home, name='group_home'),
     path('group/add', threadViews.add_group, name='group_add'),

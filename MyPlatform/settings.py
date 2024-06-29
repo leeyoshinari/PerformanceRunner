@@ -14,7 +14,9 @@ import configparser
 from pathlib import Path
 
 import redis
-import influxdb
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
+from apscheduler.schedulers.background import BackgroundScheduler
 from common.MinIOStorage import MinIOStorage
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,21 +24,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 cfg = configparser.ConfigParser()
 cfg.read(os.path.join(BASE_DIR, 'config.conf'), encoding='utf-8')
 
+
 def get_config(key):
     return cfg.get('default', key, fallback=None)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-e-f8ypr2q9w4_-v-zx19+^4(7i!lp6yu)w!wvl%+bia-u5+_lk'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-IS_ATIJMETER = int(get_config('isATIJMeter'))
 IS_MONITOR = int(get_config('isMonitor'))
 IS_PERF = int(get_config('isPerformanceTest'))
 IS_NGINX = int(get_config('isNginxFlow'))
@@ -203,7 +206,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['default'],  # default, console
+            'handlers': ['console'],  # default, console
             'level': get_config('level'),
             'propagate': True,
         }
@@ -217,7 +220,7 @@ PERFORMANCE_EXPIRE = 604800  # performance test redis keys expire time, 7D
 # The path of deploying agent
 DEPLOY_PATH = get_config('deployPath')
 # The collector-agent address
-COLLECTOR_AGENT_ADDRESS = get_config('collectorAgentAddress')
+# COLLECTOR_AGENT_ADDRESS = get_config('collectorAgentAddress')
 
 # files
 # files store local path
@@ -241,19 +244,22 @@ REDIS_HOST = get_config('RedisHost')
 REDIS_PORT = int(get_config('RedisPort'))
 REDIS_PWD = get_config('RedisPassword')
 REDIS_DB = int(get_config('RedisDB'))
-REDIS = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PWD, db=REDIS_DB, decode_responses=True)
+pool = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PWD, db=REDIS_DB, decode_responses=True, max_connections=5)
+REDIS = redis.StrictRedis(connection_pool=pool)
 
 # influxDB
-INFLUX_HOST = get_config('InfluxHost')
-INFLUX_PORT = get_config('InfluxPort')
-INFLUX_USER_NAME = get_config('InfluxUserName')
-INFLUX_PASSWORD = get_config('InfluxPassword')
-INFLUX_DATABASE = get_config('InfluxDatabase')
-INFLUX_EXPIRY_TIME = int(get_config('expiryTime'))
-INFLUX_SHARD_DURATION = get_config('shardDuration')
-INFLUX_CLIENT = influxdb.InfluxDBClient(INFLUX_HOST, INFLUX_PORT, INFLUX_USER_NAME, INFLUX_PASSWORD, INFLUX_DATABASE)
-INFLUX_CLIENT.query(f'alter retention policy "autogen" on "{INFLUX_DATABASE}" duration '
-                    f'{INFLUX_EXPIRY_TIME}d REPLICATION 1 SHARD DURATION {INFLUX_SHARD_DURATION} default;')
+INFLUX_URL = get_config('InfluxUrl')
+INFLUX_ORG = get_config('InfluxOrg')
+INFLUX_BUCKET = get_config('InfluxBucket')
+INFLUX_TOKEN = get_config('InfluxToken')
+INFLUX_CLIENT = influxdb_client.InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+
+# performance test
+# used to start task、stop task、change TPS
+PERFORMANCE_MESSAGE_KEY = 'jmeter_message'
+# used to record task's server status
+PERFORMANCE_CONSUMER_GROUP = 'jmeter_consumer'
+PERFORMANCE_MESSAGE_STREAM = 'jmeter_stream'
 
 # Email
 EMAIL_SMTP = get_config('SMTP')
@@ -262,3 +268,12 @@ EMAIL_SENDER_EMAIL = get_config('EmailSenderEmail')
 EMAIL_PASSWORD = get_config('EmailPassword')
 EMAIL_RECEIVER_NAME = get_config('EmailReceiverName')
 EMAIL_RECEIVER_EMAIL = get_config('EmailReceiverEmail')
+
+SCHEDULER = BackgroundScheduler()
+SCHEDULER.start()
+IP = '127.0.0.1'
+with os.popen("hostname -I |awk '{print $1}'") as p:
+    res = p.readlines()
+    if res:
+        IP = res[0].strip()
+

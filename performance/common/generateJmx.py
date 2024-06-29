@@ -5,6 +5,7 @@
 import json
 import time
 
+
 def generate_test_plan(plans):
     var_str = ''
     if plans.variables:
@@ -22,6 +23,7 @@ def generate_test_plan(plans):
                 plans.comment, plans.tearDown, plans.serialize, var_str)
     return test_plan, plans.duration
 
+
 def generate_thread_group(tg, num_threads, ramp_time, duration, schedule):
     if schedule == 1: duration += 60
     thread_group = '<ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="%s" enabled="%s">' \
@@ -37,6 +39,7 @@ def generate_thread_group(tg, num_threads, ramp_time, duration, schedule):
                                                                                     ramp_time, duration)
 
     return thread_group
+
 
 def generator_throughput(number_samples):
     throughput_str = '<ConstantThroughputTimer guiclass="TestBeanGUI" testclass="ConstantThroughputTimer" testname=' \
@@ -63,6 +66,7 @@ def generate_cookie(cookies):
 
     return cookie_manager
 
+
 def generator_csv(csv_file):
     csv_data_set = ''
     if csv_file:
@@ -78,6 +82,7 @@ def generator_csv(csv_file):
                         csv_data_file_path, recycle, csv_file['share_mode'], stopThread, csv_file['variable_names'])
     return csv_data_set
 
+
 def generator_controller(controllers):
     controller = '<TransactionController guiclass="TransactionControllerGui" testclass="TransactionController" ' \
                  'testname="%s" enabled="%s"><boolProp name="TransactionController.includeTimers">false</boolProp>' \
@@ -85,12 +90,14 @@ def generator_controller(controllers):
                  'comments">%s</stringProp></TransactionController>' %(controllers.name, controllers.is_valid, controllers.comment)
     return controller
 
+
 def generator_samples_and_header(samples, headers):
     http_sample_proxy = generator_samples(samples)
     header_manager = generator_header(headers)
     response_assert = generator_assert(samples.assert_type, samples.assert_content)
     all_extractor = generator_extractor(samples.extractor)
     return http_sample_proxy + '<hashTree>' + header_manager + response_assert + all_extractor + '</hashTree>'
+
 
 def generator_samples(samples):
     port = samples.port if samples.port else ''
@@ -110,6 +117,7 @@ def generator_samples(samples):
                  '</HTTPSamplerProxy>' %(samples.name, samples.is_valid, sample_arg_str, samples.domain,
                  port, samples.protocol, contentEncoding, path, samples.method, samples.comment)
     return sample_str
+
 
 def generator_sample_arguments(arguments):
     argument_str = ''
@@ -133,6 +141,7 @@ def generator_sample_arguments(arguments):
                            's">%s</collectionProp></elementProp>' %arg_str
     return argument_str
 
+
 def generator_header(headers):
     h_str = '<elementProp name="User-Agent" elementType="Header"><stringProp name="Header.name">User-Agent</stringProp>' \
             '<stringProp name="Header.value">PerformanceTest</stringProp></elementProp>'
@@ -145,6 +154,7 @@ def generator_header(headers):
 
     return header
 
+
 def generator_assert(assert_type, assert_value):
     assert_str = ''
     if assert_type and assert_value:
@@ -155,6 +165,7 @@ def generator_assert(assert_type, assert_value):
                      '_success">false</boolProp><intProp name="Assertion.test_type">%s</intProp></ResponseAssertion>' \
                      '<hashTree/>' %(int(time.time()), assert_value, assert_type)
     return assert_str
+
 
 def generator_extractor(extractors):
     regex_str = ''

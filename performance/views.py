@@ -10,16 +10,13 @@ from django.db.models.deletion import ProtectedError
 from django.conf import settings
 from .models import TestPlan, ThreadGroup, TransactionController
 from .models import HTTPRequestHeader, HTTPSampleProxy, PerformanceTestTask
-from .taskViews import start_test
+from .taskViews import start_test, stop_test, change_tps_test
 from .common.fileController import delete_local_file
 from common.Result import result
-from common.generator import toTimeStamp
-from common.multiThread import start_thread
 # Create your views here.
 
 
 logger = logging.getLogger('django')
-is_auto_run = False
 
 
 def delete_file_from_disk(file_path):
@@ -74,6 +71,7 @@ def delete(request):
             logger.error(traceback.format_exc())
             return result(code=1, msg='Delete failure ~')
 
+
 def is_valid(request):
     if request.method == 'POST':
         try:
@@ -99,46 +97,26 @@ def is_valid(request):
             logger.error(traceback.format_exc())
             return result(code=1, msg='Set failure ~')
 
+
 def request_auto_run(request):
     if request.method == 'GET':
         username = request.user.username
         ip = request.headers.get('x-real-ip')
-        start_thread(auto_run_task, ())
+        tasks = PerformanceTestTask.objects.filter(plan__schedule=1, status=0)
+        logger.info(f'Total auto test task is {len(tasks)}')
+        for task in tasks:
+            index = 0
+            total_index = len(task.plan.time_setting) - 1
+            for timing in task.plan.time_setting:
+                if index == 0:
+                    settings.SCHEDULER.add_job(start_test, 'date', run_date=timing['timing'], args=[task.id, None, username, ip], id=f"{task.id}_{index}")
+                elif index == total_index:
+                    settings.SCHEDULER.add_job(stop_test, 'date', run_date=timing['timing'], args=[task.id, 'all', username, ip], id=f"{task.id}_{index}")
+                else:
+                    settings.SCHEDULER.add_job(change_tps_test, 'date', run_date=timing['timing'], args=[task.id, 'all', timing['value'], username, ip], id=f"{task.id}_{index}")
         logger.info(f'Auto run performance test task success, operator: {username}, IP: {ip}')
         return result(msg='success')
 
-def auto_run_task():
-    global is_auto_run
-    if not is_auto_run:
-        index = 0
-        is_auto_run = True
-        while True:
-            try:
-                tasks = PerformanceTestTask.objects.filter(plan__schedule=1, status=0)
-                logger.info(f'Total auto test task is {len(tasks)}')
-                if len(tasks) == 0:
-                    index += 1
-                if index > 3:
-                    is_auto_run = False
-                    break
-                for task in tasks:
-                    scheduler = task.plan.time_setting
-                    if task.plan.type == 0 and -10 <= toTimeStamp(scheduler[0]['timing']) - time.time() <= 10:
-                        start_test(task.id, None, 'admin')
-                        logger.info(f'Task {task.id} - {task.plan.name} start success, type: Thread, operator: admin.')
-                    if task.plan.type == 1 and -10 <= toTimeStamp(scheduler[0]['timing'], delta=-60) - time.time() <= 10:
-                        start_test(task.id, None, 'admin')
-                        logger.info(f'Task {task.id} - {task.plan.name} start success, type: TPS, operator: admin.')
-                    if task.plan.type == 0 and toTimeStamp(scheduler[0]['timing']) - time.time() < -30:
-                        task.status = 4
-                        task.save()
-                        logger.info(f'Modify task {task.id} status to Cancel ~')
-                    if task.plan.type == 1 and toTimeStamp(scheduler[0]['timing'], delta=-60) - time.time() < -30:
-                        task.status = 4
-                        task.save()
-                        logger.info(f'Modify task {task.id} status to Cancel ~')
-            except:
-                logger.error(traceback.format_exc())
-            time.sleep(15)
-    else:
-        logger.info('Auto run task is running ~')
+
+# def cancel_auto_task(request):
+

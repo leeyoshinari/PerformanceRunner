@@ -9,6 +9,7 @@ from django.shortcuts import render, redirect
 from django.contrib import auth
 from django.contrib.auth.models import User
 from django.conf import settings
+from shell.models import Servers, GroupIdentifier
 from common.Result import result
 
 
@@ -91,8 +92,7 @@ def home(request):
         is_staff = request.user.is_staff
         logger.info(f'Access Home Page success, operator: {username}, ip: {ip}')
         return render(request, 'home.html', context={'username': username, 'is_monitor': settings.IS_MONITOR,
-                                                     'isATIJMeter': settings.IS_ATIJMETER, 'is_staff': is_staff,
-                                                     'is_perf': settings.IS_PERF, 'is_nginx': settings.IS_NGINX})
+                                                     'is_staff': is_staff, 'is_perf': settings.IS_PERF, 'is_nginx': settings.IS_NGINX})
     else:
         return render(request, '404.html')
 
@@ -113,8 +113,12 @@ def register_first(request):
         ip = request.headers.get('x-real-ip')
         value = request.body.decode()
         data = json.loads(value)
+        servers = Servers.objects.get(host=data['host'])
+        identifier = GroupIdentifier.objects.get(group_id=servers.group_id)
         logger.info(f"Agent: {data['host']}:{data['port']} registers successfully, ip: {ip}")
-        return result(msg='Agent registers successfully ~',data={'influx': {'host': settings.INFLUX_HOST, 'port': settings.INFLUX_PORT,
-                      'username': settings.INFLUX_USER_NAME, 'password': settings.INFLUX_PASSWORD, 'database': settings.INFLUX_DATABASE},
+        return result(msg='Agent registers successfully ~',data={'influx': {'url': settings.INFLUX_URL, 'org': settings.INFLUX_ORG,
+                      'token': settings.INFLUX_TOKEN, 'bucket': settings.INFLUX_BUCKET}, 'jmeter_message': settings.PERFORMANCE_MESSAGE_KEY,
                       'redis': {'host': settings.REDIS_HOST, 'port': settings.REDIS_PORT, 'password': settings.REDIS_PWD,
-                       'db': settings.REDIS_DB}, 'key_expire': settings.PERFORMANCE_EXPIRE, 'deploy_path': settings.DEPLOY_PATH})
+                      'db': settings.REDIS_DB}, 'key_expire': settings.PERFORMANCE_EXPIRE, 'deploy_path': settings.DEPLOY_PATH,
+                      'roomId': servers.room.id, 'groupKey': identifier.key, 'prefix': identifier.prefix,
+                      'jmeter_message_stream': settings.PERFORMANCE_MESSAGE_STREAM})

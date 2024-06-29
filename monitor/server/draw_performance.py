@@ -52,6 +52,12 @@ def draw_data_from_db(room, group, host, startTime=None, endTime=None):
         if host != 'all':
             if endTime:
                 endTime = local2utc(endTime, settings.GMT)
+                sql = '''
+                from(bucket: "server_{}")
+                    |> range(start: {}, stop: {})
+                    |> filter(fn: (r) => r._measurement == "{}")
+                    |> filter(fn: (r) => r._field == "{}")
+                '''
                 sql = f"select c_time, cpu, iowait, usr_cpu, mem, mem_available, jvm, disk, disk_r, disk_w, disk_d, rec, trans, " \
                       f"net, tcp, retrans, port_tcp, close_wait, time_wait from \"server_{group}\" where room='{room}' and host='{host}' and time>='{startTime}' " \
                       f"and time<'{endTime}';"

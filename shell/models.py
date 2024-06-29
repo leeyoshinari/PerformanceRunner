@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group
 
 # Create your models here.
 
+
 class ServerRoom(models.Model):
     id = models.CharField(max_length=16, primary_key=True, verbose_name='primary key')
     name = models.CharField(max_length=32, verbose_name='server room name')
@@ -15,6 +16,7 @@ class ServerRoom(models.Model):
     update_time = models.DateTimeField(auto_now=True, verbose_name='Update time')
     operator = models.CharField(max_length=50, verbose_name='operator')
     objects = models.Manager()
+
     class Meta:
         db_table = 'server_room'
 
@@ -25,6 +27,7 @@ class GroupIdentifier(models.Model):
     key = models.CharField(max_length=32, verbose_name='group unique identifier')
     prefix = models.CharField(max_length=32, verbose_name='url path prefix')
     objects = models.Manager()
+
     class Meta:
         db_table = 'group_identifier'
 
@@ -40,7 +43,7 @@ class Servers(models.Model):
     pwd = models.CharField(max_length=64, verbose_name='ssh login password')
     system = models.CharField(max_length=64, verbose_name='system')
     cpu = models.IntegerField(default=0, verbose_name='cpu cores (logical core)')
-    arch= models.CharField(max_length=10, verbose_name='system architecture')
+    arch = models.CharField(max_length=10, verbose_name='system architecture')
     mem = models.FloatField(default=0.0, verbose_name='memory(G)')
     disk = models.CharField(max_length=8, verbose_name='disk')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='Create time')

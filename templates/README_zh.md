@@ -51,7 +51,29 @@ nginx流量采集工具。通过实时处理nginx的访问日志(access.log)，�
 git clone https://github.com/leeyoshinari/PerformanceRunner.git
 ``` 
 
-2、安装 MySQL(SQLite3不用安装，可直接使用)、InfluxDB、Redis、MinIO(可选安装，不安装文件存本地)；（ps：暂不支持 InfluxDB2.x 版本，建议安装[ influxdb-1.8.3](https://dl.influxdata.com/influxdb/releases/influxdb-1.8.3.x86_64.rpm )）
+2、安装 MySQL(SQLite3不用安装，可直接使用)、InfluxDB、Redis、MinIO(可选安装，不安装文件存本地)；
+[redis](https://download.redis.io/releases/)
+InfluxDB: RedHat/CentOS
+```shell
+    cat <<EOF | sudo tee /etc/yum.repos.d/influxdata.repo
+    [influxdata]
+    name = InfluxData Repository - Stable
+    baseurl = https://repos.influxdata.com/stable/\$basearch/main
+    enabled = 1
+    gpgcheck = 1
+    gpgkey = https://repos.influxdata.com/influxdata-archive_compat.key
+    EOF
+
+    sudo yum install influxdb2
+```
+InfluxDB: Ubuntu/Debian
+```shell
+    wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+    echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c && cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+    echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+    
+    sudo apt-get update && sudo apt-get install influxdb2
+```
 
 3、安装第三方依赖包 
 ```shell script

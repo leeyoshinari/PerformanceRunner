@@ -299,9 +299,9 @@ def notice(request):
 
 def change_group(request):
     if request.method == 'GET':
+        username = request.user.username
+        ip = request.headers.get('x-real-ip')
         try:
-            username = request.user.username
-            ip = request.headers.get('x-real-ip')
             group_id = request.GET.get('group')
             _ = request.user.groups.get(id=group_id)
             servers = Servers.objects.values('host', 'room_id').filter(group_id=group_id)
@@ -323,9 +323,9 @@ def change_group(request):
 
 def change_room(request):
     if request.method == 'GET':
+        username = request.user.username
+        ip = request.headers.get('x-real-ip')
         try:
-            username = request.user.username
-            ip = request.headers.get('x-real-ip')
             group_id = request.GET.get('group')
             room_id = request.GET.get('room')
             _ = request.user.groups.get(id=group_id)
