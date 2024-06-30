@@ -117,7 +117,8 @@ def register_first(request):
         identifier = GroupIdentifier.objects.get(group_id=servers.group_id)
         logger.info(f"Agent: {data['host']}:{data['port']} registers successfully, ip: {ip}")
         return result(msg='Agent registers successfully ~',data={'influx': {'url': settings.INFLUX_URL, 'org': settings.INFLUX_ORG,
-                      'token': settings.INFLUX_TOKEN, 'bucket': settings.INFLUX_BUCKET}, 'jmeter_message': settings.PERFORMANCE_MESSAGE_KEY,
+                      'token': settings.INFLUX_TOKEN, 'monitor_bucket': settings.MONITOR_BUCKET, 'nginx_bucket': settings.NGINX_BUCKET,
+                      'performance_bucket': settings.PERFORMANCE_BUCKET}, 'jmeter_message': settings.PERFORMANCE_MESSAGE_KEY,
                       'redis': {'host': settings.REDIS_HOST, 'port': settings.REDIS_PORT, 'password': settings.REDIS_PWD,
                       'db': settings.REDIS_DB}, 'key_expire': settings.PERFORMANCE_EXPIRE, 'deploy_path': settings.DEPLOY_PATH,
                       'roomId': servers.room.id, 'groupKey': identifier.key, 'prefix': identifier.prefix,

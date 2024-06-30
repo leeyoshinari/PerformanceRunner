@@ -14,8 +14,7 @@ import configparser
 from pathlib import Path
 
 import redis
-import influxdb_client
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client import InfluxDBClient, BucketRetentionRules
 from apscheduler.schedulers.background import BackgroundScheduler
 from common.MinIOStorage import MinIOStorage
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -250,9 +249,37 @@ REDIS = redis.StrictRedis(connection_pool=pool)
 # influxDB
 INFLUX_URL = get_config('InfluxUrl')
 INFLUX_ORG = get_config('InfluxOrg')
-INFLUX_BUCKET = get_config('InfluxBucket')
 INFLUX_TOKEN = get_config('InfluxToken')
-INFLUX_CLIENT = influxdb_client.InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+INFLUX_CLIENT = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+INFLUX_QUERY = INFLUX_CLIENT.query_api()
+MONITOR_BUCKET = 'monitor'
+PERFORMANCE_BUCKET = 'performance'
+NGINX_BUCKET = 'nginx'
+buckets = INFLUX_CLIENT.buckets_api().find_buckets().buckets
+monitor_rule = BucketRetentionRules(type='expire', every_seconds=int(get_config('monitorExpireDay'))*24*60*60)
+bucket_exist = any(MONITOR_BUCKET == bucket.name for bucket in buckets)
+if bucket_exist:
+    bucket_obj = next(bucket for bucket in buckets if bucket.name == MONITOR_BUCKET)
+    bucket_obj.retention_rules = [monitor_rule]
+    _ = INFLUX_CLIENT.buckets_api().update_bucket(bucket_obj)
+else:
+    _ = INFLUX_CLIENT.buckets_api().create_bucket(bucket_name=MONITOR_BUCKET, org=INFLUX_ORG, retention_rules=[monitor_rule])
+performance_rule = BucketRetentionRules(type='expire', every_seconds=int(get_config('performanceExpireDay'))*24*60*60)
+bucket_exist = any(PERFORMANCE_BUCKET == bucket.name for bucket in buckets)
+if bucket_exist:
+    bucket_obj = next(bucket for bucket in buckets if bucket.name == PERFORMANCE_BUCKET)
+    bucket_obj.retention_rules = [performance_rule]
+    _ = INFLUX_CLIENT.buckets_api().update_bucket(bucket_obj)
+else:
+    _ = INFLUX_CLIENT.buckets_api().create_bucket(bucket_name=PERFORMANCE_BUCKET, org=INFLUX_ORG, retention_rules=[performance_rule])
+nginx_rule = BucketRetentionRules(type='expire', every_seconds=int(get_config('nginxExpireDay'))*24*60*60)
+bucket_exist = any(NGINX_BUCKET == bucket.name for bucket in buckets)
+if bucket_exist:
+    bucket_obj = next(bucket for bucket in buckets if bucket.name == NGINX_BUCKET)
+    bucket_obj.retention_rules = [nginx_rule]
+    _ = INFLUX_CLIENT.buckets_api().update_bucket(bucket_obj)
+else:
+    _ = INFLUX_CLIENT.buckets_api().create_bucket(bucket_name=NGINX_BUCKET, org=INFLUX_ORG, retention_rules=[nginx_rule])
 
 # performance test
 # used to start task、stop task、change TPS

@@ -6,20 +6,24 @@ import time
 import datetime
 
 
+local_format = "%Y-%m-%d %H:%M:%S"
+utc_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
 def primaryKey():
     return int(time.time() * 10000)
 
 
 def strfTime():
-    return time.strftime('%Y-%m-%d %H:%M:%S')
+    return time.strftime(local_format)
 
 
-def strfDeltaTime(delta = 0):
-    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + delta))
+def strfDeltaTime(delta=0):
+    return time.strftime(local_format, time.localtime(time.time() + delta))
 
 
 def toTimeStamp(strf_time, delta = 0):
-    return time.mktime(time.strptime(strf_time, '%Y-%m-%d %H:%M:%S')) + delta
+    return time.mktime(time.strptime(strf_time, local_format)) + delta
 
 
 def utc2local(utc_time: str, gmt: int):
@@ -30,12 +34,6 @@ def utc2local(utc_time: str, gmt: int):
     :param gmt: time zone
     :return: local time
     """
-    local_format = "%Y-%m-%d %H:%M:%S"
-    # The format "%Y-%m-%dT%H:%M:%S.%fZ" only match 6 decimal places, if it is greater than 6 digits,
-    # it needs to be divided by ".", and then converted.
-    # utc_format = "%Y-%m-%dT%H:%M:%S"
-    # local_time = datetime.datetime.strptime(utc_time.split('.')[0], utc_format) + datetime.timedelta(hours=8)
-    utc_format = "%Y-%m-%dT%H:%M:%S.%fZ"    # The format "%Y-%m-%dT%H:%M:%S.%fZ" only match 6 decimal places
     local_time = datetime.datetime.strptime(utc_time, utc_format) + datetime.timedelta(hours=gmt)
     return local_time.strftime(local_format)
 
@@ -47,7 +45,14 @@ def local2utc(local_time: str, gmt: int):
     :param gmt: time zone
     :return: UTC time
     """
-    local_format = "%Y-%m-%d %H:%M:%S"
-    utc_format = "%Y-%m-%dT%H:%M:%S.%fZ"
     utc_time = datetime.datetime.strptime(local_time, local_format) - datetime.timedelta(hours=gmt)
     return utc_time.strftime(utc_format)
+
+
+def local_date2utc_date(date_str):
+    """
+    Convert local date to UTC date
+    """
+    time_struct = time.strptime(date_str, local_format)
+    timestamp = time.mktime(time_struct)
+    return time.strftime(utc_format, time.gmtime(timestamp))

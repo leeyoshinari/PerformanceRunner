@@ -18,7 +18,7 @@ from .common.generateJmx import *
 from .common.getRedis import *
 from .common.fileController import *
 from common.Result import result, json_result
-from common.generator import primaryKey, strfTime, strfDeltaTime, toTimeStamp, local2utc
+from common.generator import primaryKey, strfTime, strfDeltaTime, toTimeStamp, local2utc, local_date2utc_date
 import redis
 # Create your views here.
 
@@ -600,11 +600,18 @@ def get_data_from_influx(delta, task_id, host='all', start_time=None, end_time=N
             end_time = strfTime()
 
         if 'T' not in start_time:
-            start_time = local2utc(start_time, settings.GMT)
+            start_time = local_date2utc_date(start_time)
         if 'T' not in end_time:
-            end_time = local2utc(end_time, settings.GMT)
+            end_time = local_date2utc_date(end_time)
 
         if delta == '520':
+            sql = f'''
+                    from(bucket: "{settings.PERFORMANCE_BUCKET}")
+                        |> range(start: {start_time}, stop: {end_time})
+                        |> filter(fn: (r) => r._measurement == "jmeter" and r.application == "{task_id}")
+                        |> window(every: 5s)
+                        |> sum(column: "_value")
+                    '''
             sql = f"select c_time, samples, tps, avg_rt, min_rt, max_rt, err, active from performance_jmeter_task where task='{task_id}' and " \
                   f"host='{host}' and time>'{start_time}';"
         else:

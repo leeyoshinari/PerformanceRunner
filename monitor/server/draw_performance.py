@@ -5,9 +5,10 @@ import time
 import logging
 import traceback
 from django.conf import settings
-from common.generator import strfDeltaTime, local2utc, utc2local, toTimeStamp
+from common.generator import strfDeltaTime, local2utc, utc2local, toTimeStamp, local_date2utc_date
 
 logger = logging.getLogger('django')
+
 
 def draw_data_from_db(room, group, host, startTime=None, endTime=None):
     """
@@ -46,41 +47,47 @@ def draw_data_from_db(room, group, host, startTime=None, endTime=None):
         if not startTime:     # If there is a start time and an end time
             startTime = strfDeltaTime(-600)
         if 'T' not in startTime:
-            startTime = local2utc(startTime, settings.GMT)
+            startTime = local_date2utc_date(startTime)
 
         s_time = time.time()
         if host != 'all':
             if endTime:
-                endTime = local2utc(endTime, settings.GMT)
-                sql = '''
-                from(bucket: "server_{}")
-                    |> range(start: {}, stop: {})
-                    |> filter(fn: (r) => r._measurement == "{}")
-                    |> filter(fn: (r) => r._field == "{}")
-                '''
-                sql = f"select c_time, cpu, iowait, usr_cpu, mem, mem_available, jvm, disk, disk_r, disk_w, disk_d, rec, trans, " \
-                      f"net, tcp, retrans, port_tcp, close_wait, time_wait from \"server_{group}\" where room='{room}' and host='{host}' and time>='{startTime}' " \
-                      f"and time<'{endTime}';"
+                endTime = local_date2utc_date(endTime)
+                sql = f'''
+                        from(bucket: "{settings.MONITOR_BUCKET}")
+                            |> range(start: {startTime}, stop: {endTime})
+                            |> filter(fn: (r) => r._measurement == "server_{group}" and r.room == "{room}" and r.host == "{host}")
+                        '''
             else:
-                sql = f"select c_time, cpu, iowait, usr_cpu, mem, mem_available, jvm, disk, disk_r, disk_w, disk_d, rec, trans, " \
-                      f"net, tcp, retrans, port_tcp, close_wait, time_wait from \"server_{group}\" where room='{room}' and host='{host}' and time>='{startTime}';"
+                sql = f'''
+                        from(bucket: "{settings.MONITOR_BUCKET}")
+                            |> range(start: {startTime})
+                            |> filter(fn: (r) => r._measurement == "server_{group}" and r.room == "{room}" and r.host == "{host}")
+                        '''
         else:
             if endTime:
-                endTime = local2utc(endTime, settings.GMT)
-                sql = f"select first(c_time) as c_time, mean(cpu) as cpu, mean(iowait) as iowait, mean(usr_cpu) as usr_cpu, mean(mem) as mem, mean(mem_available) as mem_available, " \
-                      f"mean(jvm) as jvm, mean(disk) as disk, mean(disk_r) as disk_r, mean(disk_w) as disk_w, mean(disk_d) as disk_d, mean(rec) as rec, mean(trans) as trans, " \
-                      f"mean(net) as net, mean(tcp) as tcp, mean(retrans) as retrans, mean(port_tcp) as port_tcp, mean(close_wait) as close_wait, mean(time_wait) as time_wait " \
-                      f"from \"server_{group}\" where room='{room}' and time>='{startTime}' and time<'{endTime}' group by time({settings.SAMPLING_INTERVAL}s) fill(linear);"
+                endTime = local_date2utc_date(endTime)
+                sql = f'''
+                        from(bucket: "{settings.MONITOR_BUCKET}")
+                            |> range(start: {startTime}, stop: {endTime})
+                            |> filter(fn: (r) => r._measurement == "server_{group}" and r.room == "{room}")
+                            |> window(every: {settings.SAMPLING_INTERVAL}s)
+                            |> mean(column: "_value")
+                        '''
             else:
-                sql = f"select first(c_time) as c_time, mean(cpu) as cpu, mean(iowait) as iowait, mean(usr_cpu) as usr_cpu, mean(mem) as mem, mean(mem_available) as mem_available, " \
-                      f"mean(jvm) as jvm, mean(disk) as disk, mean(disk_r) as disk_r, mean(disk_w) as disk_w, mean(disk_d) as disk_d, mean(rec) as rec, mean(trans) as trans, " \
-                      f"mean(net) as net, mean(tcp) as tcp, mean(retrans) as retrans, mean(port_tcp) as port_tcp, mean(close_wait) as close_wait, mean(time_wait) as time_wait " \
-                      f"from \"server_{group}\" where room='{room}' and time>='{startTime}' group by time({settings.SAMPLING_INTERVAL}s) fill(linear);"
+                sql = f'''
+                        from(bucket: "{settings.MONITOR_BUCKET}")
+                            |> range(start: {startTime})
+                            |> filter(fn: (r) => r._measurement == "server_{group}" and r.room == "{room}")
+                            |> window(every: {settings.SAMPLING_INTERVAL}s)
+                            |> mean(column: "_value")
+                        '''
         logger.info(f'Execute sql: {sql}')
         last_time = startTime
-        datas = settings.INFLUX_CLIENT.query(sql)
+        datas = settings.INFLUX_QUERY.query(org=settings.INFLUX_ORG, query=sql)
         if datas:
-            for data in datas.get_points():
+            for data in datas:
+                # for record in data.records:
                 if data['time'] == startTime: continue
                 if data['c_time']:
                     post_data['cpu_time'].append(data['c_time'])
@@ -174,23 +181,36 @@ def query_nginx_detail_summary(group_key, source, order_key, order_by, start_tim
         if not end_time:
             end_time = strfDeltaTime()
         if 'T' not in start_time:
-            start_time = local2utc(start_time, settings.GMT)
+            start_time = local_date2utc_date(start_time)
         if 'T' not in end_time:
-            end_time = local2utc(end_time, settings.GMT)
+            end_time = local_date2utc_date(end_time)
         s_time = time.time()
         if path:
             path = path.replace('/', '\/')
+            sql = f'''
+                    from(bucket: "{settings.NGINX_BUCKET}")
+                        |> range(start: {start_time}, stop: {end_time})
+                        |> filter(fn: (r) => r._measurement == "nginx_{group_key}" and r.source == "{source}" and r.path == "{path}")
+                        |> sum(column: "_value")
+                    '''
             sql = f"select count(rt) as sample, mean(rt) as rt, sum(size) as size, sum(error) as error from nginx_{group_key} " \
                   f"where source='{source}' and path=~/{path}/ and time > '{start_time}' and time < '{end_time}' group by path;"
         else:
+            sql = f'''
+                    from(bucket: "{settings.NGINX_BUCKET}")
+                        |> range(start: {start_time}, stop: {end_time})
+                        |> filter(fn: (r) => r._measurement == "nginx_{group_key}" and r.source == "{source}")
+                        |> sum(column: "_value")
+                    '''
             sql = f"select count(rt) as sample, mean(rt) as rt, sum(size) as size, sum(error) as error from nginx_{group_key} " \
                   f"where source='{source}' and time > '{start_time}' and time < '{end_time}' group by path;"
         logger.info(f'Execute sql: {sql}')
         datas = settings.INFLUX_CLIENT.query(sql)
         if datas:
             duration = toTimeStamp(utc2local(end_time, settings.GMT)) - toTimeStamp(utc2local(start_time, settings.GMT))
-            for data in datas._get_series():
-                post_data.append({'path': data.get('tags').get('path'), 'sample': data.get('values')[0][1], 'qps': data.get('values')[0][1]/duration, 'rt': data.get('values')[0][2], 'size': data.get('values')[0][3]/1048576, 'error': data.get('values')[0][4]})
+            for data in datas:
+                for record in data.records:
+                    post_data.append({'path': data.get('tags').get('path'), 'sample': data.get('values')[0][1], 'qps': data.get('values')[0][1]/duration, 'rt': data.get('values')[0][2], 'size': data.get('values')[0][3]/1048576, 'error': data.get('values')[0][4]})
         else:
             res['msg'] = 'No Nginx summary data is found, please check it again.'
             res['code'] = 1
@@ -222,14 +242,21 @@ def query_nginx_detail_by_path(group_key, source, path, start_time, end_time):
         if not end_time:
             end_time = strfDeltaTime()
         if 'T' not in start_time:
-            start_time = local2utc(start_time, settings.GMT)
-        end_time = local2utc(end_time, settings.GMT)
+            start_time = local_date2utc_date(start_time)
+        end_time = local_date2utc_date(end_time)
         s_time = time.time()
+        sql = f'''
+                from(bucket: "{settings.MONITOR_BUCKET}")
+                    |> range(start: {start_time}, stop: {end_time})
+                    |> filter(fn: (r) => r._measurement == "nginx_{group_key}" and r.source == "{source}" and r.path == "{path}")
+                    |> window(every: 1s)
+                    |> mean(column: "_value")
+                '''
         sql = f"select first(c_time) as c_time, count(rt) as qps, mean(rt) as rt, sum(size) as size, sum(error) as error from nginx_{group_key} " \
               f"where source='{source}' and path='{path}' and time > '{start_time}' and time < '{end_time}' group by time(1s) fill(linear);"
         logger.info(f'Execute sql: {sql}')
         last_time = start_time
-        datas = settings.INFLUX_CLIENT.query(sql)
+        datas = settings.INFLUX_QUERY.query(org=settings.INFLUX_ORG, query=sql)
         if datas:
             for data in datas.get_points():
                 if data['time'] == start_time: continue
