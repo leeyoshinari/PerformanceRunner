@@ -12,16 +12,13 @@ from django.contrib.auth.models import Group
 from shell.models import Servers, GroupIdentifier, ServerRoom
 from common.Email import sendEmail
 from common.Result import result
-from .server.request import Request
 from .server.process import Process
 from .server.draw_performance import draw_data_from_db, query_nginx_detail_summary, query_nginx_detail_by_path
-from common.generator import strfDeltaTime, local2utc
+from common.generator import strfDeltaTime
 
 
 logger = logging.getLogger('django')
-
 monitor_server = Process()
-http = Request()
 
 
 def home(request):
@@ -90,7 +87,7 @@ def get_monitor(request):
             post_data = {
                 'host': ip,
             }
-            res = http.request('post', ip, port, 'getMonitor', json=post_data)
+            res = monitor_server.request.request('post', ip, port, 'getMonitor', json=post_data)
             if res.status_code == 200:
                 response = json.loads(res.content.decode())
                 logger.debug(f'The return value of server {ip} of getting monitoring list is {response}')
@@ -193,7 +190,7 @@ def run_monitor(request):
                 'isRun': str(is_run)
             }
             port = monitor_server.get_value_by_host('Server_' + host, 'port')
-            res = http.request('post', host, port, 'runMonitor', json=post_data)
+            res = monitor_server.request.request('post', host, port, 'runMonitor', json=post_data)
 
             if res.status_code == 200:
                 return HttpResponse(content=res.content.decode())

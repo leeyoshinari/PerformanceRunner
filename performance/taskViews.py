@@ -647,5 +647,5 @@ def get_data_from_influx(delta, task_id, host='all', start_time=None, end_time=N
     return res
 
 
-t = threading.Thread(target=subscribe, args=())
-t.start()
+# t = threading.Thread(target=subscribe, args=())
+# t.start()

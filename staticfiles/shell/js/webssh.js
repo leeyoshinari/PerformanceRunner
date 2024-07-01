@@ -3,6 +3,9 @@ let viewport;
 let termnal_screen;
 
 let socketURL = 'ws://' + window.location.host + '/shell/open/' ;
+if (window.location.protocol === 'https:') {
+    socketURL = 'wss://' + window.location.host + '/shell/open/' ;
+}
 let sock = new WebSocket(socketURL);
 console.log("websocket connect success ~");
 

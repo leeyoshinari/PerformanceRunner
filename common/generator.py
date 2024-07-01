@@ -7,7 +7,7 @@ import datetime
 
 
 local_format = "%Y-%m-%d %H:%M:%S"
-utc_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+utc_format = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def primaryKey():
@@ -56,3 +56,11 @@ def local_date2utc_date(date_str):
     time_struct = time.strptime(date_str, local_format)
     timestamp = time.mktime(time_struct)
     return time.strftime(utc_format, time.gmtime(timestamp))
+
+
+def date_to_timestamp(date_str, utc=False):
+    if utc:
+        time_struct = time.strptime(date_str, utc_format)
+    else:
+        time_struct = time.strptime(date_str, local_format)
+    return time.mktime(time_struct)

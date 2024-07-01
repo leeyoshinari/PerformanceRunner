@@ -35,7 +35,7 @@ def get_config(key):
 SECRET_KEY = 'django-insecure-e-f8ypr2q9w4_-v-zx19+^4(7i!lp6yu)w!wvl%+bia-u5+_lk'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
@@ -205,7 +205,7 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],  # default, console
+            'handlers': ['default'],  # default, console
             'level': get_config('level'),
             'propagate': True,
         }
