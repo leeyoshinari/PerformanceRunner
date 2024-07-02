@@ -150,7 +150,10 @@ def add_to_task(request):
                             logger.error(f'The Controller has no HTTP Samples, operator: {username}, IP: {ip}')
                             return result(code=1, msg='The Controller has no HTTP Samples, Please add HTTP Samples ~')
 
-                        all_threads = thread_group + '<hashTree>' + throughput + cookie_manager + csv_data_set + http_controller + '</hashTree>'
+                        influx_dict = {'url': settings.INFLUX_URL, 'org': settings.INFLUX_ORG, 'task_id': task_id,
+                                       'bucket': settings.PERFORMANCE_BUCKET, 'token': settings.INFLUX_TOKEN}
+                        backends = generate_backend_listener(influx_dict)
+                        all_threads = thread_group + '<hashTree>' + throughput + cookie_manager + csv_data_set + http_controller + '</hashTree>' + backends
                         jmeter_test_plan = jmeter_header + '<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.4.3"><hashTree>' + test_plan + '<hashTree>' + all_threads + '</hashTree></hashTree></jmeterTestPlan>'
 
                         # write file to local
@@ -591,47 +594,61 @@ def query_data(request):
 
 
 def get_data_from_influx(delta, task_id, host='all', start_time=None, end_time=None):
-    query_data = {'time': [], 'c_time': [], 'samples': [], 'tps': [], 'avg_rt': [], 'min_rt': [], 'max_rt': [], 'err': [], 'active': []}
+    query_data = {'c_time': [], 'samples': [], 'tps': [], 'avg_rt': [], 'min_rt': [], 'max_rt': [], 'err': [], 'rt_90': [], 'rt_95': [], 'rt_99': [], 'rb': [], 'sb': []}
     res = {'code': 0, 'data': None, 'message': 'Query InfluxDB Successful!'}
     try:
         if not start_time:     # If there is a start time and an end time
             start_time = strfDeltaTime(-1800)
         if not end_time:
             end_time = strfTime()
-
+        exclusive_time = start_time
         if 'T' not in start_time:
             start_time = local_date2utc_date(start_time)
         if 'T' not in end_time:
             end_time = local_date2utc_date(end_time)
 
-        if delta == '520':
+        if host == 'all':
             sql = f'''
                     from(bucket: "{settings.PERFORMANCE_BUCKET}")
                         |> range(start: {start_time}, stop: {end_time})
-                        |> filter(fn: (r) => r._measurement == "jmeter" and r.application == "{task_id}")
-                        |> window(every: 5s)
-                        |> sum(column: "_value")
+                        |> filter(fn: (r) => r._measurement == "jmeter{task_id}" and r.transaction == "all" and r.statut == "all")
+                        |> filter(fn: (r) => r["_field"] == "avg" or r["_field"] == "count" or r["_field"] == "countError" or r["_field"] == "min" or r["_field"] == "max" or r["_field"] == "rb" or r["_field"] == "sb" or r["_field"] == "90.0" or r["_field"] == "95.0" or r["_field"] == "99.0")
+                        |> aggregateWindow(every: 5s, fn: sum, createEmpty: true)
+                        |> fill(column: "_value", value: 0)
+                        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                        |> map(fn: (r) => ({{ r with _time: uint(v: r._time) }}))
                     '''
-            sql = f"select c_time, samples, tps, avg_rt, min_rt, max_rt, err, active from performance_jmeter_task where task='{task_id}' and " \
-                  f"host='{host}' and time>'{start_time}';"
+            host_count = TestTaskLogs.objects.filter(task_id=task_id, action=1).count()
         else:
-            sql = f"select c_time, samples, tps, avg_rt, min_rt, max_rt, err, active from performance_jmeter_task where task='{task_id}' and " \
-                  f"host='{host}' and time>'{start_time}' and time<='{end_time}';"
-
-        logger.info(f'Execute SQL: {sql}')
-        datas = settings.INFLUX_CLIENT.query(sql)
+            sql = f'''
+                    from(bucket: "{settings.PERFORMANCE_BUCKET}")
+                        |> range(start: {start_time}, stop: {end_time})
+                        |> filter(fn: (r) => r._measurement == "jmeter{task_id}" and r.application == "{host}" and r.transaction == "all" and r.statut == "all")
+                        |> filter(fn: (r) => r["_field"] == "avg" or r["_field"] == "count" or r["_field"] == "countError" or r["_field"] == "min" or r["_field"] == "max" or r["_field"] == "rb" or r["_field"] == "sb" or r["_field"] == "90.0" or r["_field"] == "95.0" or r["_field"] == "99.0")
+                        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                        |> map(fn: (r) => ({{ r with _time: uint(v: r._time) }}))
+                    '''
+            host_count = 1
+        logger.debug(f'Execute SQL: {sql}')
+        datas = settings.INFLUX_QUERY.query(org=settings.INFLUX_ORG, query=sql)
         if datas:
-            for data in datas.get_points():
-                if data['time'] == start_time: continue
-                query_data['time'].append(data['time'])
-                query_data['c_time'].append(data['c_time'])
-                query_data['samples'].append(data['samples'])
-                query_data['tps'].append(data['tps'])
-                query_data['avg_rt'].append(data['avg_rt'])
-                query_data['min_rt'].append(data['min_rt'])
-                query_data['max_rt'].append(data['max_rt'])
-                query_data['err'].append(data['err'])
-                query_data['active'].append(data['active'])
+            for data in datas:
+                for record in data.records:
+                    date_t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(record.values['_time'] / 1000000000)))
+                    if date_t == exclusive_time: continue
+                    query_data['c_time'].append(date_t)
+                    total_sample = record.values['count']
+                    query_data['samples'].append(total_sample)
+                    query_data['tps'].append(total_sample / 5)
+                    query_data['avg_rt'].append(record.values['avg'] / host_count)
+                    query_data['min_rt'].append(record.values['min'] / host_count)
+                    query_data['max_rt'].append(record.values['max'] / host_count)
+                    query_data['err'].append(record.values['countError'])
+                    query_data['rb'].append(record.values['rb'] / 5242880)  # 1024 * 1024 * 5 = 5242880
+                    query_data['sb'].append(record.values['sb'] / 5242880)
+                    query_data['rt_90'].append(record.values['90.0'] / host_count)
+                    query_data['rt_95'].append(record.values['95.0'] / host_count)
+                    query_data['rt_99'].append(record.values['99.0'] / host_count)
         else:
             res['message'] = 'No data is found, please check or wait a minute.'
             res['code'] = 1

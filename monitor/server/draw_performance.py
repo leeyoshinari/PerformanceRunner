@@ -96,7 +96,7 @@ def draw_data_from_db(room, group, host, startTime=None, endTime=None):
                             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                             |> keep(columns: ["_time","cpu","iowait","mem","mem_available","jvm","disk","disk_r","disk_w","rec","trans","net","tcp","retrans","port_tcp","close_wait","time_wait"])
                         '''
-        logger.info(f'Execute sql: {sql}')
+        logger.debug(f'Execute sql: {sql}')
         datas = settings.INFLUX_QUERY.query(org=settings.INFLUX_ORG, query=sql)
         if datas:
             for data in datas:
